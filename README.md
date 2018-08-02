@@ -2,9 +2,9 @@
 
 ## 什么是 Electron？
 
-Electron 是一个基于 Chrominum 和 Node.js 的跨平台桌面应用框架。
+Electron是由Github开发，用HTML，CSS和JavaScript来构建跨平台桌面应用程序的一个开源库。
 
-在这个框架中很容易构建基于 HTML、CSS 和 JavaScript 技术的跨平台应用。构建出来的应用会很好地兼容 Mac、Windows 和 Linux 操作系统。
+Electron通过将Chromium和Node.js合并到同一个运行时环境中，并将其打包为Mac，Windows和Linux系统下的应用来实现这一目的。
 
 它还有其它一些特性：
 
@@ -20,13 +20,81 @@ Electron 是一个基于 Chrominum 和 Node.js 的跨平台桌面应用框架。
 
 官网：https://electronjs.org/
 
-## 开始
-按照下面的介绍将 Electron Quick Start 这个 Git 库克隆到计算机上。
+## Electron 应用结构
+### 主进程和渲染器进程
+Electron 运行 package.json 的 main 脚本的进程被称为主进程。 在主进程中运行的脚本通过创建web页面来展示用户界面。 一个 Electron 应用总是有且只有一个**主进程**。
 
-我们会基于 Electron Quick Start 来创建自己的软件。
+由于 Electron 使用了 Chromium 来展示 web 页面，所以 Chromium 的多进程架构也被使用到。 每个 Electron 中的 web 页面运行在它自己的**渲染进程**中。
+
+在普通的浏览器中，web页面通常在一个沙盒环境中运行，不被允许去接触原生的资源。 然而 Electron 的用户在 Node.js 的 API 支持下可以在页面中和操作系统进行一些底层交互。
+### 主进程和渲染进程之间的区别
+主进程使用 BrowserWindow 实例创建页面。 每个 BrowserWindow 实例都在自己的渲染进程里运行页面。 当一个 BrowserWindow 实例被销毁后，相应的渲染进程也会被终止。
+
+主进程管理所有的web页面和它们对应的渲染进程。 每个渲染进程都是独立的，它只关心它所运行的 web 页面。
+
+在页面中调用与 GUI 相关的原生 API 是不被允许的，因为在 web 页面里操作原生的 GUI 资源是非常危险的，而且容易造成资源泄露。 如果你想在 web 页面里使用 GUI 操作，其对应的渲染进程必须与主进程进行通讯，请求主进程进行相关的 GUI 操作。
+### 使用Electron的API
+Electron在主进程和渲染进程中提供了大量API去帮助开发桌面应用程序， 在主进程和渲染进程中，你可以通过require的方式将其包含在模块中以此，获取Electron的API
 
 ```
-# 克隆示例项目的仓库
+const electron = require('electron')
+```
+所有Electron的API都被指派给一种进程类型。 许多API只能被用于主进程中，有些API又只能被用于渲染进程，又有一些主进程和渲染进程中都可以使用。 每一个API的文档都将说明可以在哪种进程中使用该API。
+
+Electron中的窗口是使用BrowserWindow类型创建的一个实例， 它只能在主进程中使用。
+
+```
+// 这样写在主进程会有用，但是在渲染进程中会提示'未定义'
+  const { BrowserWindow } = require('electron')
+  
+  const win = new BrowserWindow()
+```
+因为进程之间的通信是被允许的, 所以渲染进程可以调用主进程来执行任务。 Electron通过remote模块暴露一些通常只能在主进程中获取到的API。 为了在渲染进程中创建一个BrowserWindow的实例，我们通常使用remote模块为中间件：
+
+
+```
+//这样写在渲染进程中时行得通的，但是在主进程中是'未定义'
+  const { remote } = require('electron')
+  const { BrowserWindow } = remote
+  
+  const win = new BrowserWindow()
+```
+### 使用 Node.js 的 API
+
+Electron同时在主进程和渲染进程中对Node.js 暴露了所有的接口。 这里有两个重要的定义：
+
+1. 所有在Node.js可以使用的API，在Electron中同样可以使用。 在Electron中调用如下代码是有用的：
+
+```
+const fs = require('fs')
+const root = fs.readdirSync('/')
+  
+// 这会打印出磁盘根级别的所有文件
+// 同时包含'/'和'C:\'。
+console.log(root)
+```
+
+2. 你可以在你的应用程序中使用Node.js的模块。 选择您最喜欢的 npm 模块。
+
+例如，在你的应用程序中要使用官方的AWS SDK，你需要首先安装它的依赖：
+
+
+```
+npm install --save aws-sdk
+```
+
+然后在你的Electron应用中，通过require引入并使用该模块，就像构建Node.js应用程序那样：
+
+```
+// 准备好被使用的S3 client模块
+  const S3 = require('aws-sdk/clients/s3')
+```
+
+## 开始
+将 Electron Quick Start 这个 Git 库clone到本地建好的文件夹下，我们会基于 Electron Quick Start 来创建自己的项目。
+
+```
+# clone仓库
 $ git clone https://github.com/electron/electron-quick-start
 
 # 进入这个仓库
@@ -35,18 +103,18 @@ $ cd electron-quick-start
 # 安装依赖并运行
 $ npm install && npm start
 ```
-完成上面的步骤之后，你会看到一个像浏览器窗口的应用打开。它确实是一个浏览器窗口！
+运行成功后，你会看到一个像浏览器窗口的应用打开。
 ![image](http://p5tstjsfi.bkt.clouddn.com/electron-share1.png)
 
-Quick-Start Electron 应用的主窗口
+它也确实是一个浏览器窗口！我们可以像可以在应用中使用 Chrome 开发者工具，这个工具的用法跟在浏览器中的开发者工具是一样的，调用方法：
 
-正如我之前所说，你可以在应用中使用 Chrome 开发者工具，这个工具的用法跟在浏览器中的开发者工具一样，再赞一个！
-
+```
+mainWindow.webContents.openDevTools()
+```
 ## Electron 应用程序架构
 ![image](http://p5tstjsfi.bkt.clouddn.com/electron-share2.png)
-新应用的目录和文件结构。
 
-我们有一个基本的文件结构：
+这是一个基本的文件结构：
 
 electron-quick-start
 
@@ -67,79 +135,45 @@ package.json 是应用的启动脚本。它包含了应用的信息，在主进�
 
 render.js 处理应用的渲染进程
 
-## 添加功能
+## 添加响应用户输入功能
 为了让应用响应输入，我们必须定义一个元素来捕捉事件，然后触发期望的动作。
 
-为此，我们会创建一个具有特殊名称的若干 audio 元素，对应于按键。然后我们会使用一个 switch 语句来定位按下的键，播放与之关联的声音。
-
-下载这个[压缩包](https://neutrondev.com/wp-content/uploads/2017/05/sounds.zip?x77671)，它包含了我们要使用的所有声音文件。很快就会用到！
-
-我们会打开 index.html 文件，创建一个 <audio> 元素，在我们的应用中加入声音。
-
-在 <body> 元素内部，创建一个 div 元素，将其 class 属性设置为 audio。
-
-在刚刚创建的 div 元素，创建 <audio> 元素，将其 ID 命名为 “A”，source 属性设置为 “sounds/A.mp3”，preload 属性设置为 “auto”。
-
-preload=”auto” 用于告诉应用在页面加载的时候就加载完整的声音文件。index.html 是应用的主文件，所有声音都会在应用启动的时候加载。
-
-下面是代码：
+1. 我们先创建一个具有特殊名称的若干 audio 元素，对应于按键。然后我们会使用一个 switch 语句来定位按下的键，播放与之关联的声音。下载这个[压缩包](https://neutrondev.com/wp-content/uploads/2017/05/sounds.zip?x77671)，这是所有的声音文件。
+打开 index.html 文件，创建一个 <audio> 元素，在我们的应用中加入声音：
 
 ```
 <div class="audio">
-<audio id="A" src="sounds/A.mp3" preload="auto"></audio>
+    <audio id="A" src="sounds/A.mp3" preload="auto"></audio>
 </div>
 ```
+preload=”auto” 用于告诉应用在页面加载的时候就加载完整的声音文件。index.html 是应用的主文件，所有声音都会在应用启动的时候加载。
 
-现在 <audio> 指向一个未知的文件。我们要创建一个名为 soudes 的目录，并将所有声音文件解压到这个目录中。
-
-非常好！现在唯一缺少的是 JavaScriopt 代码。
-
-创建一个叫 functions.js 的新文件，并在 index.html 中通过 require 引用它，这样应用运行的时候才会执行 JS 代码。
-
-在示例的 require(./renderer.js') 下载添加这样一行：
+2. 然后创建一个名为 sounds 的目录，并将所有声音文件解压到这个目录中。
 
 
+3. 创建一个叫 functions.js 的新文件，并在 index.html 中通过 require 引用它。
 ```
-require('./functions.js')
-```
-打开 functions.js 文件并将下面的代码添加到文件中。我稍后解释这段代码。
-```
+// document 对象是应用的主窗口
 document.onkeydown = function(e) {
+    // 根据 Unicode 值来判断按键。
     switch (e.keyCode) {
+        // 播放相应的声音
         case 65:
             document.getElementById('A').play();
             break;
+        // 抛出 “not found”(在控制台查看)
         default:
             console.log("Key is not found!");
     }
 };
 ```
-打开 Bash 或者终端窗口，确保当前是在项目目录下，运行 npm start 来启动应用。
 
-调整扬声器的音量并敲下按键。
+```
+require('./functions.js')
+```
+4. 将所有声音文件0-9a-z都引入并创建对应的audio
 
-JS 代码非常简单明了。
+5. 运行 npm start 来启动应用。
 
-我们使用了 document 对象上的 onkeydown 事件，在这里找到被访问的元素。记住，document 对象是应用的主窗口。
-
-我们在在匿名函数中使用了 switch 语句，根据 Unicode 值来判断按键。
-
-如果找到按键对应的 Unicode 值，就会播放相应的声音，否则抛出 “not found” 错误。这个错误要在控制台中去找。
-
-你可能注意到了，我们的声音文件包含了 A-Z 和 0-9 这些键，把它们都用起来。
-
-在 index.html 中为每个有对应声音文件的键都创建一个 <audio> 元素并修改functions.js文件。
-
-**大功告成！**
 ## 完善
-应用程序的功能已经完成，但它尚不完善。
-
-比如，可以在 index.html 中修应用的标题和主窗口的内容。
-
-此外，这个应用没有设计炫丽的色彩，也没有使用漂亮的图片。
-
-充分发挥你的想像，找出改进应用设计的方法。
-
-代码也不完美，我们有很多相同的代码需要优化以减少代码行数，至少看起来不那么难受。
-
-重复代码真不是好做法！
+应用程序的功能已经完成，但它尚不完善。比如，可以在 index.html中修应用的标题和主窗口的内容。或者可以给应用设计炫丽的色彩、使用漂亮的图片。
